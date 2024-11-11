@@ -18,7 +18,6 @@ LABEL_MAP = {
 class VideoCNN(nn.Module):
     def __init__(self, num_emotions=5):
         super().__init__()
-        # Input shape: (batch_size, 3, 64, 64)
         self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
@@ -27,7 +26,6 @@ class VideoCNN(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
         self.dropout = nn.Dropout(0.3)
         
-        # Calculate final feature map size
         self.fc1 = nn.Linear(256 * 4 * 4, 512)
         self.fc2 = nn.Linear(512, num_emotions)
         
@@ -37,27 +35,22 @@ class VideoCNN(nn.Module):
         self.batch_norm4 = nn.BatchNorm2d(256)
         
     def forward(self, x):
-        # Convolutional layers
         x = self.pool(F.relu(self.batch_norm1(self.conv1(x))))
         x = self.pool(F.relu(self.batch_norm2(self.conv2(x))))
         x = self.pool(F.relu(self.batch_norm3(self.conv3(x))))
         x = self.pool(F.relu(self.batch_norm4(self.conv4(x))))
         
-        # Flatten
         x = x.view(x.size(0), -1)
         
-        # Fully connected layers
         x = F.relu(self.fc1(self.dropout(x)))
         x = self.fc2(self.dropout(x))
         
         return x
 
-# 2. Custom Fusion Model
 class EmotionFusionNet(nn.Module):
     def __init__(self, num_emotions=5):
         super().__init__()
         
-        # 3D Video Processing Branch (for multiple frames)
         self.video_conv1 = nn.Conv3d(3, 32, kernel_size=3, padding=1)
         self.video_conv2 = nn.Conv3d(32, 64, kernel_size=3, padding=1)
         self.video_conv3 = nn.Conv3d(64, 128, kernel_size=3, padding=1)
@@ -66,17 +59,12 @@ class EmotionFusionNet(nn.Module):
         self.video_bn2 = nn.BatchNorm3d(64)
         self.video_bn3 = nn.BatchNorm3d(128)
         
-        # Calculate the size after 3D convolutions
-        # Input: [batch, 3, 16, 64, 64]
-        # After 3 pools: [batch, 128, 2, 8, 8]
         self.video_fc = nn.Linear(128 * 2 * 8 * 8, 256)
         
-        # Text Processing Branch
         self.embedding = nn.Embedding(10000, 128)
         self.text_lstm = nn.LSTM(128, 128, batch_first=True)
         self.text_fc = nn.Linear(128, 256)
         
-        # Fusion Layers
         self.fusion_fc1 = nn.Linear(512, 256)
         self.fusion_fc2 = nn.Linear(256, 128)
         self.fusion_fc3 = nn.Linear(128, num_emotions)
@@ -86,15 +74,7 @@ class EmotionFusionNet(nn.Module):
     def forward(self, video, text):
         batch_size = video.size(0)
         
-        # Debug print for input shapes
-        # print(f"Input shapes - Video: {video.shape}, Text: {text.shape}")
-        
-        # Video Branch
-        # Permute the dimensions from [batch, frames, channels, height, width] to [batch, channels, frames, height, width]
         video = video.permute(0, 2, 1, 3, 4)
-        # print(f"After permute shape: {video.shape}")
-        
-        # 3D CNN layers
         v = F.relu(self.video_bn1(self.video_conv1(video)))
         v = self.pool(v)
         # print(f"After conv1 shape: {v.shape}")
@@ -107,15 +87,12 @@ class EmotionFusionNet(nn.Module):
         v = self.pool(v)
         # print(f"After conv3 shape: {v.shape}")
         
-        # Flatten
         v = v.view(batch_size, -1)
         # print(f"After flatten shape: {v.shape}")
         
-        # Project video features
         v = self.video_fc(v)
         # print(f"After video projection shape: {v.shape}")
         
-        # Text Branch
         t = self.embedding(text)
         # print(f"After embedding shape: {t.shape}")
         
@@ -126,11 +103,9 @@ class EmotionFusionNet(nn.Module):
         t = self.text_fc(t)
         # print(f"After text projection shape: {t.shape}")
         
-        # Concatenate features
         combined = torch.cat((v, t), dim=1)
         # print(f"After concatenation shape: {combined.shape}")
         
-        # Fusion layers
         combined = F.relu(self.fusion_fc1(self.dropout(combined)))
         combined = F.relu(self.fusion_fc2(self.dropout(combined)))
         output = self.fusion_fc3(combined)
@@ -139,8 +114,6 @@ class EmotionFusionNet(nn.Module):
         return output
 
 
-
-# 3. Data Processing
 class EmotionDataset(Dataset):
     def __init__(self, video_paths, subtitles, labels, transform=None):
         self.video_paths = video_paths
@@ -148,22 +121,19 @@ class EmotionDataset(Dataset):
         self.labels = labels
         self.transform = transform
         
-        # Create vocabulary for text
         self.word2idx = {}
         self.build_vocab()
         
     def build_vocab(self):
-        # Build vocabulary from subtitles
         words = set()
         for text in self.subtitles:
             words.update(text.lower().split())
         self.word2idx = {word: idx for idx, word in enumerate(words, 1)}
         
     def process_text(self, text, max_length=50):
-        # Convert text to indices
         words = text.lower().split()
         indices = [self.word2idx.get(word, 0) for word in words[:max_length]]
-        indices = indices + [0] * (max_length - len(indices))  # Padding
+        indices = indices + [0] * (max_length - len(indices))
         return torch.tensor(indices)
         
     def process_video(self, video_path):
@@ -172,9 +142,9 @@ class EmotionDataset(Dataset):
 
         if not cap.isOpened():
             print(f"Could not open video: {video_path}")
-            return torch.zeros((3, 64, 64))  # Return a default frame
+            return torch.zeros((3, 64, 64))
 
-        while len(frames) < 16:  # Aim to get 16 frames
+        while len(frames) < 16:
             ret, frame = cap.read()
             if not ret:
                 break
@@ -185,12 +155,10 @@ class EmotionDataset(Dataset):
 
         cap.release()
 
-        # Check if frames are empty
         if len(frames) == 0:
             print(f"No frames extracted from video: {video_path}")
             return torch.zeros((3, 64, 64))
 
-        # Pad with zeros if necessary
         while len(frames) < 16:
             frames.append(torch.zeros_like(frames[0]))
 
@@ -204,7 +172,6 @@ class EmotionDataset(Dataset):
         video = self.process_video(self.video_paths[idx])
         text = self.process_text(self.subtitles[idx])
     
-        # Map label string to an integer using LABEL_MAP
         label_str = self.labels[idx]
         label = torch.tensor(LABEL_MAP[label_str], dtype=torch.long)
     
@@ -216,7 +183,6 @@ def calculate_class_weights(labels):
     """
     Calculate class weights inversely proportional to class frequencies
     """
-    # Count occurrences of each class
     label_counts = {}
     for label in labels:
         if label in label_counts:
@@ -224,7 +190,6 @@ def calculate_class_weights(labels):
         else:
             label_counts[label] = 1
     
-    # Calculate weights
     total_samples = len(labels)
     class_weights = {}
     for emotion, count in label_counts.items():
@@ -241,12 +206,10 @@ def calculate_class_weights(labels):
         else:
             class_weights[LABEL_MAP[emotion]] = total_samples / (len(label_counts) * count)
     
-    # Convert to tensor
     weights = torch.FloatTensor([class_weights[i] for i in range(len(LABEL_MAP))])
     return weights
 
 
-# 4. Training Functions
 def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler, num_epochs=10, device='cuda'):
     model = model.to(device)
     best_val_loss = float('inf')
@@ -254,7 +217,6 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler
     early_stopping_counter = 0
     
     for epoch in range(num_epochs):
-        # Training
         model.train()
         train_loss = 0
         correct = 0
@@ -281,7 +243,6 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler
             
         train_acc = 100. * correct / total
         
-        # Validation
         model.eval()
         val_loss = 0
         correct = 0
@@ -309,10 +270,8 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler
         print(f'Train Loss: {train_loss/len(train_loader):.3f} | Train Acc: {train_acc:.2f}%')
         print(f'Val Loss: {val_loss/len(val_loader):.3f} | Val Acc: {val_acc:.2f}%')
         
-        # Step the scheduler
         scheduler.step()
         
-        # Early stopping
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             early_stopping_counter = 0
