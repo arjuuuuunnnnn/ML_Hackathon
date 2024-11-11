@@ -69,19 +69,19 @@ class EmotionFusionNet(nn.Module):
         # Calculate the size after 3D convolutions
         # Input: [batch, 3, 16, 64, 64]
         # After 3 pools: [batch, 128, 2, 8, 8]
-        self.video_fc = nn.Linear(128 * 2 * 8 * 8, 128)
+        self.video_fc = nn.Linear(128 * 2 * 8 * 8, 256)
         
         # Text Processing Branch
-        self.embedding = nn.Embedding(10000, 64)
-        self.text_lstm = nn.LSTM(64, 64, batch_first=True)
-        self.text_fc = nn.Linear(64, 128)
+        self.embedding = nn.Embedding(10000, 128)
+        self.text_lstm = nn.LSTM(128, 128, batch_first=True)
+        self.text_fc = nn.Linear(128, 256)
         
         # Fusion Layers
-        self.fusion_fc1 = nn.Linear(256, 128)
-        self.fusion_fc2 = nn.Linear(128, 64)
-        self.fusion_fc3 = nn.Linear(64, num_emotions)
+        self.fusion_fc1 = nn.Linear(512, 256)
+        self.fusion_fc2 = nn.Linear(256, 128)
+        self.fusion_fc3 = nn.Linear(128, num_emotions)
         
-        self.dropout = nn.Dropout(0.3)
+        self.dropout = nn.Dropout(0.4)
     
     def forward(self, video, text):
         batch_size = video.size(0)
@@ -247,9 +247,11 @@ def calculate_class_weights(labels):
 
 
 # 4. Training Functions
-def train_model(model, train_loader, val_loader, criterion, optimizer, num_epochs=10, device='cuda'):
+def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler, num_epochs=10, device='cuda'):
     model = model.to(device)
     best_val_loss = float('inf')
+    early_stopping_patience = 3
+    early_stopping_counter = 0
     
     for epoch in range(num_epochs):
         # Training
@@ -306,3 +308,16 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, num_epoch
         print(f'Epoch {epoch+1}/{num_epochs}:')
         print(f'Train Loss: {train_loss/len(train_loader):.3f} | Train Acc: {train_acc:.2f}%')
         print(f'Val Loss: {val_loss/len(val_loader):.3f} | Val Acc: {val_acc:.2f}%')
+        
+        # Step the scheduler
+        scheduler.step()
+        
+        # Early stopping
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            early_stopping_counter = 0
+        else:
+            early_stopping_counter += 1
+            if early_stopping_counter >= early_stopping_patience:
+                print("Early stopping triggered")
+                break
