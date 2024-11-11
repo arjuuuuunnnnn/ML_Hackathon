@@ -1,4 +1,4 @@
-from main import EmotionFusionNet, EmotionDataset, train_model
+from model import EmotionFusionNet, EmotionDataset, train_model
 import torch
 import pandas as pd
 from torch.utils.data import DataLoader, random_split

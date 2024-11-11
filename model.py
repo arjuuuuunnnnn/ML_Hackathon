@@ -15,7 +15,6 @@ LABEL_MAP = {
 }
 
 
-
 class VideoCNN(nn.Module):
     def __init__(self, num_emotions=5):
         super().__init__()
@@ -54,82 +53,6 @@ class VideoCNN(nn.Module):
         return x
 
 # 2. Custom Fusion Model
-# class EmotionFusionNet(nn.Module):
-#     def __init__(self, num_emotions=5):
-#         super().__init__()
-        
-#         # Video Processing Branch
-#         self.video_conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)
-#         self.video_conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-#         self.video_conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-#         self.pool = nn.MaxPool2d(2, 2)
-#         self.video_bn1 = nn.BatchNorm2d(32)
-#         self.video_bn2 = nn.BatchNorm2d(64)
-#         self.video_bn3 = nn.BatchNorm2d(128)
-        
-#         self.video_fc = nn.Linear(128 * 8 * 8, 512)
-
-#         # Text Processing Branch
-#         self.embedding = nn.Embedding(10000, 128)  # Vocabulary size of 10000
-#         self.text_lstm = nn.LSTM(128, 256, batch_first=True, bidirectional=True)
-        
-#         self.text_fc = nn.Linear(2 * 256, 128)  # 2 * 256 because LSTM is bidirectional
-
-#         # Fusion Layers
-#         self.fusion_fc1 = nn.Linear(128 * 8 * 8 + 512, 512)  # Concatenated features
-#         self.fusion_fc2 = nn.Linear(512, 256)
-#         self.fusion_fc3 = nn.Linear(256, num_emotions)
-        
-#         self.dropout = nn.Dropout(0.3) 
-
-#     def forward(self, video, text):
-#         # Video Branch
-#         batch_size = video.size(0)
-
-#         print(f"Input shapes - Video: {video.shape}, Text: {text.shape}")
-
-#         video = video.reshape(batch_size, 3, 64, 64)
-
-#         v = F.relu(self.video_bn1(self.video_conv1(video)))
-#         v = self.pool(v)
-#         v = F.relu(self.video_bn2(self.video_conv2(v)))
-#         v = self.pool(v)
-#         v = F.relu(self.video_bn3(self.video_conv3(v)))
-#         v = self.pool(v)
-
-#         print(f"After convolutions shape: {v.shape}")
-        
-#         v = v.view(batch_size, -1)  # Flatten the video tensor
-#         print(f"After flatten shape: {v.shape}")
-#         v = self.video_fc(v)
-#         print(f"After video projection shape: {v.shape}")
-
-#         # Text Branch
-#         t = self.embedding(text)  # Apply embedding
-#         print(f"After embedding shape: {t.shape}")
-#         t, (hidden, _) = self.text_lstm(t)  # Get the LSTM output
-#         t = hidden[-1]
-
-#         print(f"After LSTM shape: {t.shape}")
-
-#         # t = torch.cat((hidden[-2,:,:], hidden[-1,:,:]), dim=1)  # Concatenate bidirectional LSTM
-#         t = self.text_fc(t)
-        
-#         print(f"After text projection shape: {t.shape}")
-        
-#         # Ensure shapes match before concatenation
-#         print(f"Shapes before concatenation - Video: {v.shape}, Text: {t.shape}")
-
-#         # Fusion
-#         combined = torch.cat((v, t), dim=1)  # Concatenate along dimension 1
-#         print(f"After concatenation shape: {combined.shape}")
-#         combined = F.relu(self.fusion_fc1(self.dropout(combined)))
-#         combined = F.relu(self.fusion_fc2(self.dropout(combined)))
-#         output = self.fusion_fc3(combined)
-#         print(f"Final output shape: {output.shape}")
-#         return output
-
-
 class EmotionFusionNet(nn.Module):
     def __init__(self, num_emotions=5):
         super().__init__()
@@ -243,26 +166,6 @@ class EmotionDataset(Dataset):
         indices = indices + [0] * (max_length - len(indices))  # Padding
         return torch.tensor(indices)
         
-    # def process_video(self, video_path):
-    #     # Extract face from video frame
-    #     cap = cv2.VideoCapture(video_path)
-    #     frames = []
-    #     while len(frames) < 16:  # Get 16 frames
-    #         ret, frame = cap.read()
-    #         if not ret:
-    #             break
-    #         frame = cv2.resize(frame, (64, 64))
-    #         if self.transform:
-    #             frame = self.transform(frame)
-    #         frames.append(frame)
-    #     cap.release()
-        
-    #     # Pad if necessary
-    #     while len(frames) < 16:
-    #         frames.append(torch.zeros_like(frames[0]))
-            
-    #     return torch.stack(frames)
-
     def process_video(self, video_path):
         cap = cv2.VideoCapture(video_path)
         frames = []
@@ -295,13 +198,7 @@ class EmotionDataset(Dataset):
 
         
     def __len__(self):
-        return len(self.video_paths)
-        
-    # def __getitem__(self, idx):
-    #     video = self.process_video(self.video_paths[idx])
-    #     text = self.process_text(self.subtitles[idx])
-    #     label = self.labels[idx]
-    #     return video, text, label
+        return len(self.video_paths) 
 
     def __getitem__(self, idx):
         video = self.process_video(self.video_paths[idx])
