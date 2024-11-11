@@ -24,7 +24,10 @@ def main():
     
     # 3. Create transform for videos
     transform = transforms.Compose([
-        transforms.ToTensor()
+        transforms.ToTensor(),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(10),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2)
     ])
     
     # 4. Create dataset
@@ -61,6 +64,9 @@ def main():
     criterion = torch.nn.CrossEntropyLoss(weight=weights)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     
+    # 9.5 Add learning rate scheduler
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+    
     # 10. Train
     train_model(
         model=model,
@@ -68,6 +74,7 @@ def main():
         val_loader=val_loader,
         criterion=criterion,
         optimizer=optimizer,
+        scheduler=scheduler,
         num_epochs=10,
         device=device
     )

@@ -1,10 +1,11 @@
 import torch
 from model import EmotionFusionNet, EmotionDataset
 from torchvision import transforms
-import cv2
+import pandas as pd
 import os
+from torch.utils.data import DataLoader
 
-# Define the label map (same as in main.py)
+# Define the label map
 LABEL_MAP = {
     "neutral": 0,
     "joy": 1,
@@ -13,75 +14,104 @@ LABEL_MAP = {
     "surprise": 4
 }
 
-def test_single_video(video_path, text, model_path='emotion_model.pth'):
+def predict_test_set(test_csv_path, video_folder_path, model_path='emotion_model.pth', batch_size=8):
     # Set device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
-    # Initialize model
+    # Read test CSV
+    df = pd.read_csv(test_csv_path, encoding='cp1252')
+    
+    # Store Sr No. for later use
+    sr_numbers = df['Sr No.'].tolist()
+    
+    # Prepare data paths
+    video_paths = [
+        os.path.join(video_folder_path, f"dia{row['Dialogue_ID']}_utt{row['Utterance_ID']}.mp4")
+        for _, row in df.iterrows()
+    ]
+    subtitles = df['Utterance'].tolist()
+    
+    # Create dummy labels (required by dataset class but won't be used)
+    dummy_labels = ['neutral'] * len(video_paths)
+    
+    # Create transform
+    transform = transforms.Compose([
+        transforms.ToTensor()
+    ])
+    
+    # Create dataset
+    test_dataset = EmotionDataset(
+        video_paths=video_paths,
+        subtitles=subtitles,
+        labels=dummy_labels,
+        transform=transform
+    )
+    
+    # Create dataloader
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    
+    # Load model
     model = EmotionFusionNet(num_emotions=5)
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.to(device)
     model.eval()
     
-    # Create a minimal dataset with just one sample
-    transform = transforms.Compose([
-        transforms.ToTensor()
-    ])
+    # Lists to store predictions
+    all_predictions = []
     
-    # Create dataset with single sample
-    dataset = EmotionDataset(
-        video_paths=[video_path],
-        subtitles=[text],
-        labels=['neutral'],  # dummy label
-        transform=transform
-    )
-    
-    # Get the single sample
-    video, text_tensor, _ = dataset[0]
-    
-    # Add batch dimension
-    video = video.unsqueeze(0).to(device)
-    text_tensor = text_tensor.unsqueeze(0).to(device)
-    
-    # Print shapes for debugging
-    print(f"Video shape: {video.shape}")
-    print(f"Text shape: {text_tensor.shape}")
-    
-    # Get prediction
-    try:
-        with torch.no_grad():
-            outputs = model(video, text_tensor)
+    # Predict
+    print("Making predictions...")
+    with torch.no_grad():
+        for batch_idx, (videos, texts, _) in enumerate(test_loader):
+            videos = videos.to(device)
+            texts = texts.to(device)
+            
+            outputs = model(videos, texts)
             probabilities = torch.softmax(outputs, dim=1)
-            predicted_class = torch.argmax(probabilities, dim=1)
-        
-        # Convert prediction to emotion label using the global LABEL_MAP
-        reverse_label_map = {v: k for k, v in LABEL_MAP.items()}
-        predicted_emotion = reverse_label_map[predicted_class.item()]
-        
-        # Get probability distribution
-        probs_dict = {reverse_label_map[i]: prob.item() for i, prob in enumerate(probabilities[0])}
-        
-        return predicted_emotion, probs_dict
+            predicted_classes = torch.argmax(probabilities, dim=1)
+            
+            # Convert predictions to emotion labels
+            reverse_label_map = {v: k for k, v in LABEL_MAP.items()}
+            batch_predictions = [reverse_label_map[pred.item()] for pred in predicted_classes]
+            all_predictions.extend(batch_predictions)
+            
+            # Print progress
+            if (batch_idx + 1) % 10 == 0:
+                print(f"Processed {(batch_idx + 1) * batch_size} samples...")
     
-    except Exception as e:
-        print(f"Error during model prediction: {str(e)}")
-        raise
+    # Create submission DataFrame with original Sr No.
+    submission_df = pd.DataFrame({
+        'Sr No.': sr_numbers,
+        'Emotion': all_predictions
+    })
+    
+    return submission_df
 
 def main():
-    # Example usage
-    video_path = "data/train_videos/dia126_utt5.mp4"  # Replace with your video path
-    text = "Stop it! I will kill you. I hate the fact that my roomis very small"  # Replace with your text
+    # Configuration
+    test_csv_path = 'data/test.csv'  # Path to your test CSV
+    video_folder_path = 'data/test_videos'  # Path to test videos folder
+    model_path = 'emotion_model.pth'  # Path to your trained model
+    output_path = 'submission.csv'  # Where to save the submission file
     
     try:
-        predicted_emotion, probabilities = test_single_video(video_path, text)
+        # Make predictions
+        print("Starting prediction process...")
+        submission_df = predict_test_set(
+            test_csv_path=test_csv_path,
+            video_folder_path=video_folder_path,
+            model_path=model_path
+        )
         
-        print("\nPrediction Results:")
-        print(f"Predicted Emotion: {predicted_emotion}")
-        print("\nProbabilities for each emotion:")
-        for emotion, prob in probabilities.items():
-            print(f"{emotion}: {prob:.4f}")
-            
+        # Save submission file
+        submission_df.to_csv(output_path, index=False)
+        print(f"Submission file saved to {output_path}")
+        
+        # Display first few predictions
+        print("\nFirst few predictions:")
+        print(submission_df.head())
+        
     except Exception as e:
         print(f"Error during prediction: {str(e)}")
         import traceback
