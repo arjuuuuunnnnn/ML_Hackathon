@@ -1,4 +1,4 @@
-from model import EmotionFusionNet, EmotionDataset, train_model
+from model import EmotionFusionNet, EmotionDataset, train_model, calculate_class_weights
 import torch
 import pandas as pd
 from torch.utils.data import DataLoader, random_split
@@ -50,9 +50,15 @@ def main():
     
     # 8. Create model
     model = EmotionFusionNet(num_emotions=5)  # adjust num_emotions based on your classes
+    model = model.to(device)
     
+    # 8.5 Calculate class weights
+    train_labels = [labels[i] for i in train_dataset.indices]
+    weights = calculate_class_weights(train_labels)
+    weights = weights.to(device)
+
     # 9. Setup loss and optimizer
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = torch.nn.CrossEntropyLoss(weight=weights)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     
     # 10. Train

@@ -209,7 +209,36 @@ class EmotionDataset(Dataset):
         label = torch.tensor(LABEL_MAP[label_str], dtype=torch.long)
     
         return video, text, label
- 
+
+
+
+def calculate_class_weights(labels):
+    """
+    Calculate class weights inversely proportional to class frequencies
+    """
+    # Count occurrences of each class
+    label_counts = {}
+    for label in labels:
+        if label in label_counts:
+            label_counts[label] += 1
+        else:
+            label_counts[label] = 1
+    
+    # Calculate weights
+    total_samples = len(labels)
+    class_weights = {}
+    for emotion, count in label_counts.items():
+        if emotion == "neutral":
+            # Assign lower weight to neutral class (you can adjust this factor)
+            class_weights[LABEL_MAP[emotion]] = 0.5
+        else:
+            # For other classes, use balanced weights
+            class_weights[LABEL_MAP[emotion]] = total_samples / (len(label_counts) * count)
+    
+    # Convert to tensor
+    weights = torch.FloatTensor([class_weights[i] for i in range(len(LABEL_MAP))])
+    return weights
+
 
 # 4. Training Functions
 def train_model(model, train_loader, val_loader, criterion, optimizer, num_epochs=10, device='cuda'):
