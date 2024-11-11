@@ -87,55 +87,55 @@ class EmotionFusionNet(nn.Module):
         batch_size = video.size(0)
         
         # Debug print for input shapes
-        print(f"Input shapes - Video: {video.shape}, Text: {text.shape}")
+        # print(f"Input shapes - Video: {video.shape}, Text: {text.shape}")
         
         # Video Branch
         # Permute the dimensions from [batch, frames, channels, height, width] to [batch, channels, frames, height, width]
         video = video.permute(0, 2, 1, 3, 4)
-        print(f"After permute shape: {video.shape}")
+        # print(f"After permute shape: {video.shape}")
         
         # 3D CNN layers
         v = F.relu(self.video_bn1(self.video_conv1(video)))
         v = self.pool(v)
-        print(f"After conv1 shape: {v.shape}")
+        # print(f"After conv1 shape: {v.shape}")
         
         v = F.relu(self.video_bn2(self.video_conv2(v)))
         v = self.pool(v)
-        print(f"After conv2 shape: {v.shape}")
+        # print(f"After conv2 shape: {v.shape}")
         
         v = F.relu(self.video_bn3(self.video_conv3(v)))
         v = self.pool(v)
-        print(f"After conv3 shape: {v.shape}")
+        # print(f"After conv3 shape: {v.shape}")
         
         # Flatten
         v = v.view(batch_size, -1)
-        print(f"After flatten shape: {v.shape}")
+        # print(f"After flatten shape: {v.shape}")
         
         # Project video features
         v = self.video_fc(v)
-        print(f"After video projection shape: {v.shape}")
+        # print(f"After video projection shape: {v.shape}")
         
         # Text Branch
         t = self.embedding(text)
-        print(f"After embedding shape: {t.shape}")
+        # print(f"After embedding shape: {t.shape}")
         
         t, (hidden, _) = self.text_lstm(t)
         t = hidden[-1]
-        print(f"After LSTM shape: {t.shape}")
+        # print(f"After LSTM shape: {t.shape}")
         
         t = self.text_fc(t)
-        print(f"After text projection shape: {t.shape}")
+        # print(f"After text projection shape: {t.shape}")
         
         # Concatenate features
         combined = torch.cat((v, t), dim=1)
-        print(f"After concatenation shape: {combined.shape}")
+        # print(f"After concatenation shape: {combined.shape}")
         
         # Fusion layers
         combined = F.relu(self.fusion_fc1(self.dropout(combined)))
         combined = F.relu(self.fusion_fc2(self.dropout(combined)))
         output = self.fusion_fc3(combined)
         
-        print(f"Final output shape: {output.shape}")
+        # print(f"Final output shape: {output.shape}")
         return output
 
 
@@ -229,10 +229,8 @@ def calculate_class_weights(labels):
     class_weights = {}
     for emotion, count in label_counts.items():
         if emotion == "neutral":
-            # Assign lower weight to neutral class (you can adjust this factor)
             class_weights[LABEL_MAP[emotion]] = 0.5
         else:
-            # For other classes, use balanced weights
             class_weights[LABEL_MAP[emotion]] = total_samples / (len(label_counts) * count)
     
     # Convert to tensor
