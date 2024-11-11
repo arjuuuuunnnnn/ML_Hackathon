@@ -229,7 +229,15 @@ def calculate_class_weights(labels):
     class_weights = {}
     for emotion, count in label_counts.items():
         if emotion == "neutral":
-            class_weights[LABEL_MAP[emotion]] = 0.5
+            class_weights[LABEL_MAP[emotion]] = 0.501
+        if emotion == "joy":
+            class_weights[LABEL_MAP[emotion]] = 0.816
+        if emotion == "anger":
+            class_weights[LABEL_MAP[emotion]] = 0.883
+        if emotion == "surprise":
+            class_weights[LABEL_MAP[emotion]] = 0.8729
+        if emotion == "sadness":
+            class_weights[LABEL_MAP[emotion]] = 0.928
         else:
             class_weights[LABEL_MAP[emotion]] = total_samples / (len(label_counts) * count)
     
